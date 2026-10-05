@@ -52,9 +52,19 @@ jobs:
             publish/XenonForge.exe
 
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
         shell: powershell
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ github.ref_name }}" .\XenonForge-win-x64.zip .\XenonForge-win-x64.zip.sha256 .\publish\XenonForge.exe --title "XenonForge ${{ github.ref_name }}" --notes "First XenonForge release: native VB.NET ISO-to-GOD engine, game identification, modern queue UI, smart trim and direct USB deployment. No iso2god.exe required."
+          if ("${{ github.ref }}".StartsWith("refs/tags/")) {
+            $tag = "${{ github.ref_name }}"
+          } else {
+            $tag = "v1.0.0"
+            gh release view $tag --repo "${{ github.repository }}" *> $null
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "Release $tag already exists; skipping bootstrap release."
+              exit 0
+            }
+          }
+          gh release create $tag .\XenonForge-win-x64.zip .\XenonForge-win-x64.zip.sha256 .\publish\XenonForge.exe --target "${{ github.sha }}" --title "XenonForge $tag" --notes-file .\RELEASE_NOTES.md
