@@ -94,9 +94,9 @@ Namespace Services
                 Dim destFile = Path.Combine(destination, Path.GetFileName(file))
                 CopyFile(file, destFile, total, copied, progress, cancellationToken)
             Next
-            For Each dir In Directory.GetDirectories(source)
+            For Each folderPath In Directory.GetDirectories(source)
                 cancellationToken.ThrowIfCancellationRequested()
-                CopyDirectory(dir, Path.Combine(destination, Path.GetFileName(dir)), total, copied, progress, cancellationToken)
+                CopyDirectory(folderPath, Path.Combine(destination, Path.GetFileName(folderPath)), total, copied, progress, cancellationToken)
             Next
         End Sub
 
