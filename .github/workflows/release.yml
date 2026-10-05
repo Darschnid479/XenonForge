@@ -31,6 +31,26 @@ jobs:
         shell: powershell
         run: dotnet publish .\XenonForge\XenonForge.vbproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o .\publish
 
+      - name: Smoke test startup
+        shell: powershell
+        run: |
+          $logDir = Join-Path $env:LOCALAPPDATA "XenonForge"
+          Remove-Item -Recurse -Force $logDir -ErrorAction SilentlyContinue
+          $p = Start-Process -FilePath ".\publish\XenonForge.exe" -PassThru
+          Start-Sleep -Seconds 5
+          if ($p.HasExited) {
+            Write-Host "XenonForge exited during startup with code $($p.ExitCode)."
+            $log = Join-Path $logDir "startup-crash.log"
+            if (Test-Path $log) {
+              Write-Host "----- startup-crash.log -----"
+              Get-Content $log
+              Write-Host "-----------------------------"
+            }
+            throw "XenonForge failed startup smoke test."
+          }
+          Stop-Process -Id $p.Id -Force
+          Write-Host "Startup smoke test passed."
+
       - name: Package release
         shell: powershell
         run: |
