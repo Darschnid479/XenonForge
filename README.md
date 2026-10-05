@@ -2,7 +2,7 @@
 
 > **Xbox 360 GOD Studio** — inspect Redump ISOs, identify the game, convert natively to Games on Demand, and deploy the finished package straight to USB.
 
-![XenonForge main window](screenshots/main.png)
+![XenonForge main window](screenshots/main.svg)
 
 XenonForge is a modern Windows utility written in **VB.NET / .NET 8**. The conversion engine is part of the application itself: there is **no `iso2god.exe` process, no Rust runtime, and no external converter binary at runtime**.
 
@@ -18,7 +18,7 @@ XenonForge is a modern Windows utility written in **VB.NET / .NET 8**. The conve
 
 ## USB workflow
 
-![XenonForge USB deploy](screenshots/usb-deploy.png)
+![XenonForge USB deploy](screenshots/usb-deploy.svg)
 
 1. Add one or more `.iso` files.
 2. XenonForge reads the disc metadata and shows the detected game.
