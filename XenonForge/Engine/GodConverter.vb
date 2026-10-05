@@ -151,10 +151,10 @@ Namespace Engine
         Private Shared Function BuildMhtChain(dataFolder As String, partCount As Long) As Byte()
             Dim current = ReadMht(Path.Combine(dataFolder, $"Data{partCount - 1:0000}"))
             For index = partCount - 2 To 0 Step -1
-                Dim path = Path.Combine(dataFolder, $"Data{index:0000}")
-                Dim previous = ReadMht(path)
+                Dim partPath = Path.Combine(dataFolder, $"Data{index:0000}")
+                Dim previous = ReadMht(partPath)
                 previous.AddHash(current.Digest())
-                WriteMht(path, previous)
+                WriteMht(partPath, previous)
                 current = previous
             Next
             Return current.Digest()
@@ -220,7 +220,7 @@ Namespace Engine
                 Array.Copy(digest, 0, header, &H32C, digest.Length)
             End Using
 
-            Directory.CreateDirectory(Path.GetDirectoryName(path))
+            Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path))
             File.WriteAllBytes(path, header)
         End Sub
 
