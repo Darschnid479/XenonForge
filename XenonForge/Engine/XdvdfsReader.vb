@@ -78,6 +78,34 @@ Namespace Engine
             Return BinaryHelpers.ReadExactlyAt(_stream, _partitionOffset + CLng(entry.Sector) * SectorSize, count)
         End Function
 
+
+        Public Sub CopyEntryToFile(entry As XdvdfsEntry,
+                                   destinationPath As String,
+                                   cancellationToken As Threading.CancellationToken)
+            If entry Is Nothing Then Throw New ArgumentNullException(NameOf(entry))
+            If entry.IsDirectory Then Throw New InvalidOperationException("Cannot copy a directory entry as a file.")
+
+            Dim parent = Path.GetDirectoryName(destinationPath)
+            If Not String.IsNullOrWhiteSpace(parent) Then Directory.CreateDirectory(parent)
+
+            Const BufferSize As Integer = 1024 * 1024
+            Dim buffer(BufferSize - 1) As Byte
+            Dim remaining As Long = entry.Size
+            _stream.Position = _partitionOffset + CLng(entry.Sector) * SectorSize
+
+            Using output As New FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None, BufferSize, FileOptions.SequentialScan)
+                While remaining > 0
+                    cancellationToken.ThrowIfCancellationRequested()
+                    Dim want = CInt(Math.Min(CLng(buffer.Length), remaining))
+                    Dim read = _stream.Read(buffer, 0, want)
+                    If read <= 0 Then Throw New EndOfStreamException($"Unexpected end of ISO while extracting {entry.Name}.")
+                    output.Write(buffer, 0, read)
+                    remaining -= read
+                End While
+                output.Flush(True)
+            End Using
+        End Sub
+
         Public Function GetMaxUsedPrefixSize() As Long
             Dim maxEnd As Long = &H21L * SectorSize
             maxEnd = Math.Max(maxEnd, CLng(_rootSector) * SectorSize + _rootSize)
