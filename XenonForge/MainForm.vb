@@ -43,7 +43,7 @@ Public Class MainForm
 
         AddHandler DragEnter, AddressOf OnDragEnterFiles
         AddHandler DragDrop, AddressOf OnDragDropFiles
-        AddHandler FormClosing, AddressOf OnClosing
+        AddHandler FormClosing, AddressOf MainForm_FormClosing
     End Sub
 
     Private Sub BuildUi()
@@ -568,7 +568,7 @@ Public Class MainForm
         Return $"{value / 1024.0:0} KB"
     End Function
 
-    Private Sub OnClosing(sender As Object, e As FormClosingEventArgs)
+    Private Sub MainForm_FormClosing(sender As Object, e As FormClosingEventArgs)
         SaveSettings()
         If _busy Then _cts?.Cancel()
     End Sub
