@@ -1,3 +1,7 @@
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Linq
+Imports System.Threading.Tasks
 Imports System.IO
 Imports System.Threading
 Imports System.Windows.Forms
@@ -353,20 +357,20 @@ Public Class MainForm
     End Sub
 
     Private Sub AddIsoFiles(paths As IEnumerable(Of String))
-        For Each path In paths
-            If Not File.Exists(path) Then Continue For
-            If Not Path.GetExtension(path).Equals(".iso", StringComparison.OrdinalIgnoreCase) Then Continue For
-            If queue.Items.Cast(Of ListViewItem)().Any(Function(x) String.Equals(CStr(x.Tag), path, StringComparison.OrdinalIgnoreCase)) Then Continue For
+        For Each isoPath In paths
+            If Not File.Exists(isoPath) Then Continue For
+            If Not Path.GetExtension(isoPath).Equals(".iso", StringComparison.OrdinalIgnoreCase) Then Continue For
+            If queue.Items.Cast(Of ListViewItem)().Any(Function(x) String.Equals(CStr(x.Tag), isoPath, StringComparison.OrdinalIgnoreCase)) Then Continue For
 
             Dim row As New ListViewItem("Reading metadata…")
             row.SubItems.Add("—")
             row.SubItems.Add("—")
             row.SubItems.Add("—")
-            row.SubItems.Add(FormatBytes(New FileInfo(path).Length))
+            row.SubItems.Add(FormatBytes(New FileInfo(isoPath).Length))
             row.SubItems.Add("Scanning")
-            row.Tag = path
+            row.Tag = isoPath
             queue.Items.Add(row)
-            ScanRowAsync(row, path)
+            ScanRowAsync(row, isoPath)
         Next
     End Sub
 
