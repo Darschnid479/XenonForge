@@ -160,20 +160,26 @@ Public Class MainForm
         AddHandler addFolder.Click, AddressOf AddFolderClick
         main.Controls.Add(addFolder)
 
-        Dim convert = MakeButton("CONVERT QUEUE", Theme.Blue, Color.FromArgb(112, 172, 255), Color.White)
+        Dim convert = MakeButton("CONVERT GOD", Theme.Blue, Color.FromArgb(112, 172, 255), Color.White)
         convert.Location = New Point(314, 104)
-        convert.Width = 154
+        convert.Width = 136
         AddHandler convert.Click, Async Sub(sender, e) Await ConvertQueueAsync(False)
         main.Controls.Add(convert)
 
-        Dim convertUsb = MakeButton("CONVERT + USB", Color.FromArgb(115, 88, 220), Color.FromArgb(136, 108, 235), Color.White)
-        convertUsb.Location = New Point(478, 104)
-        convertUsb.Width = 154
+        Dim extractXex = MakeButton("EXTRACT XEX", Color.FromArgb(34, 197, 94), Color.FromArgb(74, 222, 128), Theme.Background)
+        extractXex.Location = New Point(460, 104)
+        extractXex.Width = 132
+        AddHandler extractXex.Click, Async Sub(sender, e) Await ExtractXexQueueAsync()
+        main.Controls.Add(extractXex)
+
+        Dim convertUsb = MakeButton("GOD + USB", Color.FromArgb(115, 88, 220), Color.FromArgb(136, 108, 235), Color.White)
+        convertUsb.Location = New Point(602, 104)
+        convertUsb.Width = 118
         AddHandler convertUsb.Click, Async Sub(sender, e) Await ConvertQueueAsync(True)
         main.Controls.Add(convertUsb)
 
         Dim cancel = MakeButton("CANCEL", Color.FromArgb(80, 38, 47), Color.FromArgb(112, 47, 58), Theme.Danger)
-        cancel.Location = New Point(642, 104)
+        cancel.Location = New Point(730, 104)
         cancel.Width = 92
         AddHandler cancel.Click, Sub(sender, e) _cts?.Cancel()
         main.Controls.Add(cancel)
@@ -471,6 +477,75 @@ Public Class MainForm
             AppendLog($"ERROR {System.IO.Path.GetFileName(isoPath)} — {ex.Message}")
         End Try
     End Sub
+
+
+    Private Async Function ExtractXexQueueAsync() As Task
+        If _busy Then Return
+
+        Dim ready = queue.Items.Cast(Of ListViewItem)().
+            Where(Function(x)
+                      If TypeOf x.Tag Is XboxTitleInfo Then Return True
+                      Dim state = TryCast(x.Tag, RowState)
+                      Return state IsNot Nothing AndAlso state.Info IsNot Nothing
+                  End Function).
+            ToList()
+
+        If ready.Count = 0 Then
+            MessageBox.Show(Me, "Add a valid Xbox ISO first.", "XenonForge", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+
+        Dim root = outputBox.Text.Trim()
+        If String.IsNullOrWhiteSpace(root) Then root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "XenonForge")
+        Directory.CreateDirectory(root)
+
+        _busy = True
+        _cts = New CancellationTokenSource()
+        SetBusy(True)
+
+        Try
+            For Each row In ready
+                _cts.Token.ThrowIfCancellationRequested()
+
+                Dim info = TryCast(row.Tag, XboxTitleInfo)
+                If info Is Nothing Then
+                    Dim state = TryCast(row.Tag, RowState)
+                    If state IsNot Nothing Then info = state.Info
+                End If
+                If info Is Nothing Then Continue For
+
+                row.SubItems(5).Text = "Extracting XEX"
+                AppendLog($"XEX   START {info.DisplayName}")
+
+                Dim extractor As New XexExtractor()
+                Dim xp As New Progress(Of XexExtractionProgress)(
+                    Sub(p)
+                        progress.Value = p.Percent
+                        status.Text = $"XEX {p.Percent}% — {p.CurrentPath}"
+                        row.SubItems(5).Text = $"XEX {p.Percent}%"
+                    End Sub)
+
+                Dim result = Await extractor.ExtractAsync(info, root, xp, _cts.Token)
+                row.SubItems(5).Text = "XEX Ready"
+                AppendLog($"XEXOK {info.DisplayName} → {result.OutputFolder}")
+            Next
+
+            progress.Value = 100
+            status.Text = "XEX extraction complete."
+        Catch ex As OperationCanceledException
+            AppendLog("CANCEL XEX extraction cancelled.")
+            status.Text = "Cancelled."
+        Catch ex As Exception
+            AppendLog($"XEXERR {ex.Message}")
+            MessageBox.Show(Me, ex.Message, "XenonForge XEX extraction failed", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            status.Text = "XEX extraction failed."
+        Finally
+            _busy = False
+            SetBusy(False)
+            _cts.Dispose()
+            _cts = Nothing
+        End Try
+    End Function
 
     Private Async Function ConvertQueueAsync(deployAfter As Boolean) As Task
         If _busy Then Return
