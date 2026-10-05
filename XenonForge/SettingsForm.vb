@@ -104,7 +104,8 @@ Public NotInheritable Class SettingsForm
         }
         AddHandler clearCovers.Click,
             Sub()
-                New CoverArtService().ClearCache()
+                Dim coverService As New CoverArtService()
+                coverService.ClearCache()
                 MessageBox.Show(Me, "Cover cache cleared.", "XenonForge", MessageBoxButtons.OK, MessageBoxIcon.Information)
             End Sub
         card.Controls.Add(clearCovers)
