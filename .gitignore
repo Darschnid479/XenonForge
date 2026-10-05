@@ -1,0 +1,11 @@
+.vs/
+bin/
+obj/
+publish/
+release/
+XenonForge-win-x64.zip
+XenonForge-win-x64.zip.sha256
+XenonForge/Resources/empty_live.bin
+XenonForge/Resources/titles.jsonl
+*.user
+*.suo
