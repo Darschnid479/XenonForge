@@ -49,7 +49,7 @@ Friend Module Program
 
     Private Sub WriteCrashLog(path As String, category As String, ex As Exception)
         Try
-            Dim folder = Path.GetDirectoryName(path)
+            Dim folder = System.IO.Path.GetDirectoryName(path)
             If Not String.IsNullOrWhiteSpace(folder) Then Directory.CreateDirectory(folder)
 
             Dim sb As New StringBuilder()
