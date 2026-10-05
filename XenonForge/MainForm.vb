@@ -277,7 +277,7 @@ Public Class MainForm
         refreshUsb.Location = New Point(18, 340)
         refreshUsb.Width = 128
         refreshUsb.Anchor = AnchorStyles.Left Or AnchorStyles.Bottom
-        AddHandler refreshUsb.Click, Sub(sender, e) RefreshUsb()
+        AddHandler refreshUsb.Click, Sub(sender, e) Me.RefreshUsb()
         details.Controls.Add(refreshUsb)
 
         Dim deploy = MakeButton("DEPLOY SELECTED", Theme.Accent, Theme.AccentHover, Theme.Background)
