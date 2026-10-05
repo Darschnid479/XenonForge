@@ -154,19 +154,19 @@ Public Class MainForm
         Dim convert = MakeButton("CONVERT QUEUE", Theme.Blue, Color.FromArgb(112, 172, 255), Color.White)
         convert.Location = New Point(302, 104)
         convert.Width = 154
-        AddHandler convert.Click, Async Sub() Await ConvertQueueAsync(False)
+        AddHandler convert.Click, Async Sub(sender, e) Await ConvertQueueAsync(False)
         main.Controls.Add(convert)
 
         Dim convertUsb = MakeButton("CONVERT + USB", Color.FromArgb(115, 88, 220), Color.FromArgb(136, 108, 235), Color.White)
         convertUsb.Location = New Point(466, 104)
         convertUsb.Width = 154
-        AddHandler convertUsb.Click, Async Sub() Await ConvertQueueAsync(True)
+        AddHandler convertUsb.Click, Async Sub(sender, e) Await ConvertQueueAsync(True)
         main.Controls.Add(convertUsb)
 
         Dim cancel = MakeButton("CANCEL", Color.FromArgb(80, 38, 47), Color.FromArgb(112, 47, 58), Theme.Danger)
         cancel.Location = New Point(630, 104)
         cancel.Width = 92
-        AddHandler cancel.Click, Sub() _cts?.Cancel()
+        AddHandler cancel.Click, Sub(sender, e) _cts?.Cancel()
         main.Controls.Add(cancel)
 
         Dim split As New TableLayoutPanel With {
@@ -277,14 +277,14 @@ Public Class MainForm
         refreshUsb.Location = New Point(18, 340)
         refreshUsb.Width = 128
         refreshUsb.Anchor = AnchorStyles.Left Or AnchorStyles.Bottom
-        AddHandler refreshUsb.Click, Sub() RefreshUsb()
+        AddHandler refreshUsb.Click, Sub(sender, e) RefreshUsb()
         details.Controls.Add(refreshUsb)
 
         Dim deploy = MakeButton("DEPLOY SELECTED", Theme.Accent, Theme.AccentHover, Theme.Background)
         deploy.Location = New Point(156, 340)
         deploy.Width = 150
         deploy.Anchor = AnchorStyles.Left Or AnchorStyles.Bottom
-        AddHandler deploy.Click, Async Sub() Await DeploySelectedAsync()
+        AddHandler deploy.Click, Async Sub(sender, e) Await DeploySelectedAsync()
         details.Controls.Add(deploy)
 
         Dim activity As New RoundedPanel With {.Dock = DockStyle.Fill, .Margin = New Padding(0, 0, 0, 0), .FillColor = Theme.Surface, .BorderColor = Theme.Border, .Radius = 16}
@@ -374,9 +374,9 @@ Public Class MainForm
         Next
     End Sub
 
-    Private Async Sub ScanRowAsync(row As ListViewItem, path As String)
+    Private Async Sub ScanRowAsync(row As ListViewItem, isoPath As String)
         Try
-            Dim info = Await Task.Run(Function() XboxExecutableParser.ReadTitleInfo(path))
+            Dim info = Await Task.Run(Function() XboxExecutableParser.ReadTitleInfo(isoPath))
             row.Tag = info
             row.Text = info.DisplayName
             row.SubItems(1).Text = info.TitleIdHex
@@ -388,10 +388,10 @@ Public Class MainForm
             AppendLog($"SCAN  {info.DisplayName}  [{info.TitleIdHex}]  {info.DiscKind}")
             If queue.SelectedItems.Count = 0 Then row.Selected = True
         Catch ex As Exception
-            row.Text = Path.GetFileNameWithoutExtension(path)
+            row.Text = System.IO.Path.GetFileNameWithoutExtension(isoPath)
             row.SubItems(5).Text = "Invalid"
             row.ToolTipText = ex.Message
-            AppendLog($"ERROR {Path.GetFileName(path)} — {ex.Message}")
+            AppendLog($"ERROR {System.IO.Path.GetFileName(isoPath)} — {ex.Message}")
         End Try
     End Sub
 
