@@ -1,0 +1,36 @@
+name: Bug report
+description: Report a XenonForge conversion, metadata, UI, or USB deployment issue
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - ISO detection / metadata
+        - GOD conversion
+        - USB deployment
+        - User interface
+        - Build / release
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Include the exact XenonForge error/activity text. Do not upload copyrighted game images.
+    validations:
+      required: true
+  - type: input
+    id: titleid
+    attributes:
+      label: Title ID (if known)
+  - type: input
+    id: format
+    attributes:
+      label: Detected disc format (XSF/XGD1/XGD2/XGD3)
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
