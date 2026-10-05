@@ -13,6 +13,7 @@ Public Class MainForm
 
     Private ReadOnly _settings As AppSettings = AppSettings.Load()
     Private ReadOnly _usb As New UsbDeploymentService()
+    Private ReadOnly _zipImport As New ZipImportService()
     Private _cts As CancellationTokenSource
     Private _busy As Boolean
 
@@ -147,32 +148,32 @@ Public Class MainForm
             .Location = New Point(31, 64)
         })
 
-        Dim addIso = MakeButton("+  ADD ISO", Theme.Accent, Theme.AccentHover, Theme.Background)
+        Dim addIso = MakeButton("+  ADD ISO/ZIP", Theme.Accent, Theme.AccentHover, Theme.Background)
         addIso.Location = New Point(28, 104)
-        addIso.Width = 124
+        addIso.Width = 136
         AddHandler addIso.Click, AddressOf AddIsoClick
         main.Controls.Add(addIso)
 
         Dim addFolder = MakeButton("ADD FOLDER", Theme.Surface2, Color.FromArgb(36, 48, 78), Theme.TextPrimary)
-        addFolder.Location = New Point(162, 104)
+        addFolder.Location = New Point(174, 104)
         addFolder.Width = 126
         AddHandler addFolder.Click, AddressOf AddFolderClick
         main.Controls.Add(addFolder)
 
         Dim convert = MakeButton("CONVERT QUEUE", Theme.Blue, Color.FromArgb(112, 172, 255), Color.White)
-        convert.Location = New Point(302, 104)
+        convert.Location = New Point(314, 104)
         convert.Width = 154
         AddHandler convert.Click, Async Sub(sender, e) Await ConvertQueueAsync(False)
         main.Controls.Add(convert)
 
         Dim convertUsb = MakeButton("CONVERT + USB", Color.FromArgb(115, 88, 220), Color.FromArgb(136, 108, 235), Color.White)
-        convertUsb.Location = New Point(466, 104)
+        convertUsb.Location = New Point(478, 104)
         convertUsb.Width = 154
         AddHandler convertUsb.Click, Async Sub(sender, e) Await ConvertQueueAsync(True)
         main.Controls.Add(convertUsb)
 
         Dim cancel = MakeButton("CANCEL", Color.FromArgb(80, 38, 47), Color.FromArgb(112, 47, 58), Theme.Danger)
-        cancel.Location = New Point(630, 104)
+        cancel.Location = New Point(642, 104)
         cancel.Width = 92
         AddHandler cancel.Click, Sub(sender, e) _cts?.Cancel()
         main.Controls.Add(cancel)
@@ -200,7 +201,7 @@ Public Class MainForm
             .BackColor = queueCard.FillColor
         })
         queueCard.Controls.Add(New Label With {
-            .Text = "Drop Redump/Xbox ISO files here. Metadata is read before conversion.",
+            .Text = "Drop Xbox ISO or ZIP files here. ZIP archives are unpacked automatically.",
             .Font = Theme.Font(8.5F),
             .ForeColor = Theme.TextMuted,
             .AutoSize = True,
@@ -369,16 +370,67 @@ Public Class MainForm
     End Sub
 
     Private Sub AddIsoClick(sender As Object, e As EventArgs)
-        Using dialog As New OpenFileDialog With {.Filter = "Xbox ISO (*.iso)|*.iso", .Multiselect = True, .Title = "Add Xbox ISO"}
-            If dialog.ShowDialog(Me) = DialogResult.OK Then AddIsoFiles(dialog.FileNames)
+        Using dialog As New OpenFileDialog With {
+            .Filter = "Xbox ISO or ZIP (*.iso;*.zip)|*.iso;*.zip|Xbox ISO (*.iso)|*.iso|ZIP archive (*.zip)|*.zip",
+            .Multiselect = True,
+            .Title = "Add Xbox ISO or ZIP"
+        }
+            If dialog.ShowDialog(Me) = DialogResult.OK Then AddInputFiles(dialog.FileNames)
         End Using
     End Sub
 
     Private Sub AddFolderClick(sender As Object, e As EventArgs)
-        Using dialog As New FolderBrowserDialog With {.Description = "Scan a folder for Xbox ISO files", .UseDescriptionForTitle = True}
+        Using dialog As New FolderBrowserDialog With {.Description = "Scan a folder for Xbox ISO and ZIP files", .UseDescriptionForTitle = True}
             If dialog.ShowDialog(Me) <> DialogResult.OK Then Return
-            AddIsoFiles(Directory.EnumerateFiles(dialog.SelectedPath, "*.iso", SearchOption.AllDirectories))
+            Dim inputs = Directory.EnumerateFiles(dialog.SelectedPath, "*.*", SearchOption.AllDirectories).
+                Where(Function(p)
+                          Dim ext = System.IO.Path.GetExtension(p)
+                          Return ext.Equals(".iso", StringComparison.OrdinalIgnoreCase) OrElse
+                                 ext.Equals(".zip", StringComparison.OrdinalIgnoreCase)
+                      End Function)
+            AddInputFiles(inputs)
         End Using
+    End Sub
+
+    Private Sub AddInputFiles(paths As IEnumerable(Of String))
+        For Each inputPath In paths
+            If Not File.Exists(inputPath) Then Continue For
+
+            Dim ext = System.IO.Path.GetExtension(inputPath)
+            If ext.Equals(".iso", StringComparison.OrdinalIgnoreCase) Then
+                AddIsoFiles({inputPath})
+            ElseIf ext.Equals(".zip", StringComparison.OrdinalIgnoreCase) Then
+                ImportZipAsync(inputPath)
+            End If
+        Next
+    End Sub
+
+    Private Async Sub ImportZipAsync(zipPath As String)
+        If _busy Then
+            AppendLog($"ZIP   Busy — skipped {System.IO.Path.GetFileName(zipPath)}")
+            Return
+        End If
+
+        Try
+            status.Text = $"Extracting {System.IO.Path.GetFileName(zipPath)}..."
+            AppendLog($"ZIP   Extracting {System.IO.Path.GetFileName(zipPath)}")
+
+            Dim result = Await _zipImport.ExtractIsosAndDeleteZipAsync(zipPath, CancellationToken.None)
+
+            AddIsoFiles(result.ExtractedIsoPaths)
+
+            AppendLog($"ZIPOK {result.ExtractedIsoPaths.Count} ISO file(s) extracted. ZIP deleted.")
+            status.Text = $"ZIP extracted — {result.ExtractedIsoPaths.Count} ISO file(s) added to queue."
+        Catch ex As Exception
+            AppendLog($"ZIPERR {System.IO.Path.GetFileName(zipPath)} — {ex.Message}")
+            status.Text = "ZIP import failed. Archive was kept when extraction was not verified."
+            MessageBox.Show(
+                Me,
+                ex.Message,
+                "XenonForge ZIP import",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error)
+        End Try
     End Sub
 
     Private Sub AddIsoFiles(paths As IEnumerable(Of String))
@@ -633,10 +685,16 @@ Public Class MainForm
             If File.Exists(item) Then
                 all.Add(item)
             ElseIf Directory.Exists(item) Then
-                all.AddRange(Directory.EnumerateFiles(item, "*.iso", SearchOption.AllDirectories))
+                all.AddRange(
+                    Directory.EnumerateFiles(item, "*.*", SearchOption.AllDirectories).
+                    Where(Function(p)
+                              Dim ext = System.IO.Path.GetExtension(p)
+                              Return ext.Equals(".iso", StringComparison.OrdinalIgnoreCase) OrElse
+                                     ext.Equals(".zip", StringComparison.OrdinalIgnoreCase)
+                          End Function))
             End If
         Next
-        AddIsoFiles(all)
+        AddInputFiles(all)
     End Sub
 
     Private Sub SetBusy(value As Boolean)
