@@ -67,7 +67,7 @@ Namespace Engine
                     fileCount += 1
 
                     progress?.Report(New XexExtractionProgress With {
-                        .Percent = CInt(Math.Min(100L, copied * 100L  Math.Max(1L, totalBytes))),
+                        .Percent = CInt(Math.Min(100L, copied * 100L \ Math.Max(1L, totalBytes))),
                         .CurrentPath = relative,
                         .BytesProcessed = copied,
                         .TotalBytes = totalBytes
