@@ -25,6 +25,9 @@ Public Class MainForm
     Private ReadOnly detailName As New Label()
     Private ReadOnly detailMeta As New Label()
     Private ReadOnly logBox As New RichTextBox()
+    Private ReadOnly coverBox As New PictureBox()
+    Private ReadOnly _coverArt As New CoverArtService()
+    Private _coverCts As CancellationTokenSource
 
     Public Sub New()
         Text = "XenonForge — Xbox 360 GOD Studio"
@@ -81,10 +84,15 @@ Public Class MainForm
             .Location = New Point(73, 50)
         })
 
-        AddSideLabel(sidebar, "●  CONVERT", 120, True)
-        AddSideLabel(sidebar, "▣  USB DEPLOY", 166, False)
-        AddSideLabel(sidebar, "◫  LIBRARY", 212, False)
-        AddSideLabel(sidebar, "⚙  SETTINGS", 258, False)
+        Dim navConvert = AddSideLabel(sidebar, "●  CONVERT", 120, True)
+        Dim navUsb = AddSideLabel(sidebar, "▣  USB DEPLOY", 166, False)
+        Dim navLibrary = AddSideLabel(sidebar, "◫  LIBRARY", 212, False)
+        Dim navSettings = AddSideLabel(sidebar, "⚙  SETTINGS", 258, False)
+
+        AddHandler navConvert.Click, Sub() status.Text = "Convert workspace active."
+        AddHandler navUsb.Click, AddressOf OpenUsbDeploy
+        AddHandler navLibrary.Click, AddressOf OpenLibrary
+        AddHandler navSettings.Click, AddressOf OpenSettings
 
         Dim engineCard As New RoundedPanel With {
             .Location = New Point(18, 660),
@@ -227,18 +235,24 @@ Public Class MainForm
         Dim details As New RoundedPanel With {.Dock = DockStyle.Fill, .Margin = New Padding(0, 0, 0, 10), .FillColor = Theme.Surface, .BorderColor = Theme.Border, .Radius = 16}
         right.Controls.Add(details, 0, 0)
         details.Controls.Add(New Label With {.Text = "GAME DETAILS", .Font = Theme.Font(9.0F, FontStyle.Bold), .ForeColor = Theme.TextPrimary, .AutoSize = True, .Location = New Point(18, 16), .BackColor = details.FillColor})
+        coverBox.Location = New Point(18, 52)
+        coverBox.Size = New Size(116, 162)
+        coverBox.SizeMode = PictureBoxSizeMode.Zoom
+        coverBox.BackColor = Color.FromArgb(10, 15, 27)
+        details.Controls.Add(coverBox)
+
         detailName.Text = "Select a game"
-        detailName.Font = Theme.Font(16.0F, FontStyle.Bold)
+        detailName.Font = Theme.Font(15.0F, FontStyle.Bold)
         detailName.ForeColor = Theme.TextPrimary
-        detailName.Location = New Point(18, 52)
-        detailName.Size = New Size(350, 60)
+        detailName.Location = New Point(150, 52)
+        detailName.Size = New Size(210, 60)
         detailName.BackColor = details.FillColor
         details.Controls.Add(detailName)
         detailMeta.Text = "Title ID —" & Environment.NewLine & "Media ID —" & Environment.NewLine & "Disc —" & Environment.NewLine & "Format —"
-        detailMeta.Font = Theme.Font(9.5F)
+        detailMeta.Font = Theme.Font(9.0F)
         detailMeta.ForeColor = Theme.TextMuted
-        detailMeta.Location = New Point(18, 116)
-        detailMeta.Size = New Size(350, 100)
+        detailMeta.Location = New Point(150, 116)
+        detailMeta.Size = New Size(210, 100)
         detailMeta.BackColor = details.FillColor
         details.Controls.Add(detailMeta)
 
@@ -313,8 +327,8 @@ Public Class MainForm
         main.Controls.Add(status)
     End Sub
 
-    Private Shared Sub AddSideLabel(parent As Control, text As String, y As Integer, active As Boolean)
-        parent.Controls.Add(New Label With {
+    Private Shared Function AddSideLabel(parent As Control, text As String, y As Integer, active As Boolean) As Label
+        Dim item As New Label With {
             .Text = text,
             .Location = New Point(18, y),
             .Size = New Size(184, 40),
@@ -322,9 +336,20 @@ Public Class MainForm
             .TextAlign = ContentAlignment.MiddleLeft,
             .Font = Theme.Font(9.0F, FontStyle.Bold),
             .ForeColor = If(active, Theme.Accent, Theme.TextMuted),
-            .BackColor = If(active, Color.FromArgb(18, 43, 48), Color.Transparent)
-        })
-    End Sub
+            .BackColor = If(active, Color.FromArgb(18, 43, 48), Color.Transparent),
+            .Cursor = Cursors.Hand
+        }
+        AddHandler item.MouseEnter, Sub()
+                                        If Not active Then item.BackColor = Color.FromArgb(17, 25, 43)
+                                        item.ForeColor = Theme.Accent
+                                    End Sub
+        AddHandler item.MouseLeave, Sub()
+                                        item.BackColor = If(active, Color.FromArgb(18, 43, 48), Color.Transparent)
+                                        item.ForeColor = If(active, Theme.Accent, Theme.TextMuted)
+                                    End Sub
+        parent.Controls.Add(item)
+        Return item
+    End Function
 
     Private Shared Function MakeButton(text As String, fill As Color, hover As Color, fore As Color) As ModernButton
         Return New ModernButton With {.Text = text, .FillColor = fill, .HoverColor = hover, .ForeColor = fore, .Height = 42}
@@ -508,7 +533,7 @@ Public Class MainForm
         AppendLog($"DRIVE {targets.Count} destination drive(s) detected.")
     End Sub
 
-    Private Sub QueueSelectionChanged(sender As Object, e As EventArgs)
+    Private Async Sub QueueSelectionChanged(sender As Object, e As EventArgs)
         If queue.SelectedItems.Count = 0 Then Return
         Dim tag = queue.SelectedItems(0).Tag
         Dim info = TryCast(tag, XboxTitleInfo)
@@ -522,7 +547,72 @@ Public Class MainForm
                           $"Media ID   {info.MediaIdHex}" & Environment.NewLine &
                           $"Disc       {Math.Max(1, CInt(info.DiscNumber))} / {Math.Max(1, CInt(info.DiscCount))}" & Environment.NewLine &
                           $"Format     {info.DiscKind}   •   {FormatBytes(info.IsoSize)}"
+
+        Await LoadCoverAsync(info.TitleIdHex)
     End Sub
+
+
+    Private Sub OpenUsbDeploy(sender As Object, e As EventArgs)
+        Using dialog As New UsbDeployForm(GetCompletedResults(), _usb)
+            dialog.ShowDialog(Me)
+        End Using
+        RefreshUsb()
+    End Sub
+
+    Private Sub OpenLibrary(sender As Object, e As EventArgs)
+        SaveSettings()
+        Using dialog As New LibraryForm(_settings.OutputFolder)
+            dialog.ShowDialog(Me)
+        End Using
+    End Sub
+
+    Private Sub OpenSettings(sender As Object, e As EventArgs)
+        SaveSettings()
+        Using dialog As New SettingsForm(_settings)
+            If dialog.ShowDialog(Me) = DialogResult.OK Then
+                LoadSettings()
+                RefreshUsb()
+                status.Text = "Settings saved."
+            End If
+        End Using
+    End Sub
+
+    Private Function GetCompletedResults() As List(Of GodConversionResult)
+        Dim results As New List(Of GodConversionResult)()
+        For Each row As ListViewItem In queue.Items
+            Dim state = TryCast(row.Tag, RowState)
+            If state IsNot Nothing AndAlso state.Result IsNot Nothing Then results.Add(state.Result)
+        Next
+        Return results
+    End Function
+
+    Private Async Function LoadCoverAsync(titleIdHex As String) As Task
+        _coverCts?.Cancel()
+        _coverCts?.Dispose()
+        _coverCts = New CancellationTokenSource()
+        Dim token = _coverCts.Token
+
+        Try
+            Dim bytes = Await _coverArt.GetCoverBytesAsync(titleIdHex, token)
+            If token.IsCancellationRequested Then Return
+
+            Dim nextImage As Image = Nothing
+            If bytes IsNot Nothing Then
+                Using ms As New MemoryStream(bytes)
+                    Using source = Image.FromStream(ms)
+                        nextImage = New Bitmap(source)
+                    End Using
+                End Using
+            End If
+
+            Dim old = coverBox.Image
+            coverBox.Image = nextImage
+            If old IsNot Nothing Then old.Dispose()
+        Catch ex As OperationCanceledException
+        Catch ex As Exception
+            AppendLog($"COVER {titleIdHex} — {ex.Message}")
+        End Try
+    End Function
 
     Private Sub BrowseOutput(sender As Object, e As EventArgs)
         Using dialog As New FolderBrowserDialog With {.Description = "Choose GOD output folder", .UseDescriptionForTitle = True}
@@ -571,6 +661,12 @@ Public Class MainForm
     Private Sub MainForm_FormClosing(sender As Object, e As FormClosingEventArgs)
         SaveSettings()
         If _busy Then _cts?.Cancel()
+        _coverCts?.Cancel()
+        _coverCts?.Dispose()
+        If coverBox.Image IsNot Nothing Then
+            coverBox.Image.Dispose()
+            coverBox.Image = Nothing
+        End If
     End Sub
 
     Private NotInheritable Class RowState
