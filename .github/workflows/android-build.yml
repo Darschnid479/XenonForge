@@ -14,6 +14,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: xenonforge-v2-release
+  cancel-in-progress: true
+
 jobs:
   build-both:
     runs-on: windows-latest
@@ -34,7 +38,7 @@ jobs:
 
       - name: Install Android workload
         shell: pwsh
-        run: dotnet workload install android
+        run: dotnet workload install android --skip-manifest-update
 
       - name: Prepare embedded assets
         shell: pwsh
