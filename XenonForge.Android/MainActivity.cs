@@ -57,7 +57,7 @@ public sealed class MainActivity : Activity
             TextSize = 28f
         };
         brand.SetTextColor(Color.Rgb(64, 224, 208));
-        brand.SetTypeface(null, Android.Graphics.TypefaceStyle.Bold);
+        brand.SetTypeface(null, global::Android.Graphics.TypefaceStyle.Bold);
         root.AddView(brand);
 
         var subtitle = new TextView(this)
@@ -97,7 +97,7 @@ public sealed class MainActivity : Activity
         _cancelButton.Click += (_, _) => _cts?.Cancel();
         root.AddView(_cancelButton, Margin(bottom: 20));
 
-        _progress = new ProgressBar(this, null, Android.Resource.Attribute.ProgressBarStyleHorizontal)
+        _progress = new ProgressBar(this, null, global::Android.Resource.Attribute.ProgressBarStyleHorizontal)
         {
             Max = 100,
             Progress = 0
@@ -225,7 +225,7 @@ public sealed class MainActivity : Activity
         }
     }
 
-    async Task<string> CopyUriToImportsAsync(Android.Net.Uri uri)
+    async Task<string> CopyUriToImportsAsync(global::Android.Net.Uri uri)
     {
         var imports = Path.Combine(CacheDir!.AbsolutePath, "imports");
         Directory.CreateDirectory(imports);
@@ -247,7 +247,7 @@ public sealed class MainActivity : Activity
         return target;
     }
 
-    string QueryDisplayName(Android.Net.Uri uri)
+    string QueryDisplayName(global::Android.Net.Uri uri)
     {
         using var cursor = ContentResolver!.Query(uri, null, null, null, null);
         if (cursor is null || !cursor.MoveToFirst()) return string.Empty;
@@ -349,7 +349,7 @@ public sealed class MainActivity : Activity
 
     string GetOutputRoot()
     {
-        var baseDir = GetExternalFilesDir(Android.OS.Environment.DirectoryDocuments)
+        var baseDir = GetExternalFilesDir(global::Android.OS.Environment.DirectoryDocuments)
             ?? FilesDir
             ?? throw new IOException("Android storage is unavailable.");
 
