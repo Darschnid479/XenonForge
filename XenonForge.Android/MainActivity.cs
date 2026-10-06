@@ -13,7 +13,7 @@ using BitmapFactory = Android.Graphics.BitmapFactory;
 using IOPath = System.IO.Path;
 using OperationCanceledException = System.OperationCanceledException;
 
-namespace XenonForge.AndroidApp;
+namespace XenonForgeMobile;
 
 [Activity(
     Label = "XenonForge",
