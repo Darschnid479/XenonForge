@@ -82,7 +82,7 @@ jobs:
 
   android:
     name: Android APK
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
@@ -94,7 +94,6 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Install Android workload
-        shell: pwsh
         run: dotnet workload install android --skip-manifest-update
 
       - name: Prepare embedded assets
