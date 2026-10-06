@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>XenonForge</RootNamespace>
+    <AssemblyName>XenonForge.Core</AssemblyName>
+    <OptionStrict>On</OptionStrict>
+    <OptionExplicit>On</OptionExplicit>
+    <OptionInfer>On</OptionInfer>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\XenonForge\Engine\BinaryHelpers.vb" Link="Engine\BinaryHelpers.vb" />
+    <Compile Include="..\XenonForge\Engine\GameCatalog.vb" Link="Engine\GameCatalog.vb" />
+    <Compile Include="..\XenonForge\Engine\GodConverter.vb" Link="Engine\GodConverter.vb" />
+    <Compile Include="..\XenonForge\Engine\Models.vb" Link="Engine\Models.vb" />
+    <Compile Include="..\XenonForge\Engine\XboxExecutableParser.vb" Link="Engine\XboxExecutableParser.vb" />
+    <Compile Include="..\XenonForge\Engine\XdvdfsReader.vb" Link="Engine\XdvdfsReader.vb" />
+    <Compile Include="..\XenonForge\Engine\XexExtractor.vb" Link="Engine\XexExtractor.vb" />
+    <Compile Include="..\XenonForge\Services\ZipImportService.vb" Link="Services\ZipImportService.vb" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\XenonForge\Resources\empty_live.bin"
+                      LogicalName="XenonForge.empty_live.bin"
+                      Condition="Exists('..\XenonForge\Resources\empty_live.bin')" />
+    <EmbeddedResource Include="..\XenonForge\Resources\titles.jsonl"
+                      LogicalName="XenonForge.titles.jsonl"
+                      Condition="Exists('..\XenonForge\Resources\titles.jsonl')" />
+  </ItemGroup>
+</Project>
