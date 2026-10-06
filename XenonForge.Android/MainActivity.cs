@@ -1,6 +1,8 @@
 using Android.App;
 using Android.Content;
-using Android.Graphics;
+using Color = Android.Graphics.Color;
+using IOPath = System.IO.Path;
+using OperationCanceledException = System.OperationCanceledException;
 using Android.OS;
 using Android.Provider;
 using Android.Views;
@@ -173,7 +175,7 @@ public sealed class MainActivity : Activity
             _progress.Progress = 2;
 
             var imported = await CopyUriToImportsAsync(data.Data);
-            var ext = Path.GetExtension(imported);
+            var ext = IOPath.GetExtension(imported);
 
             if (ext.Equals(".zip", StringComparison.OrdinalIgnoreCase))
             {
@@ -202,7 +204,7 @@ public sealed class MainActivity : Activity
                 $"{_titleInfo.DisplayName}\n" +
                 $"Title ID: {_titleInfo.TitleIdHex}\n" +
                 $"Media ID: {_titleInfo.MediaIdHex}\n" +
-                $"Disc: {Math.Max(1, _titleInfo.DiscNumber)}/{Math.Max(1, _titleInfo.DiscCount)}\n" +
+                $"Disc: {Math.Max(1, (int)_titleInfo.DiscNumber)}/{Math.Max(1, (int)_titleInfo.DiscCount)}\n" +
                 $"Format: {_titleInfo.DiscKind}\n" +
                 $"ISO: {FormatBytes(_titleInfo.IsoSize)}";
 
@@ -227,7 +229,7 @@ public sealed class MainActivity : Activity
 
     async Task<string> CopyUriToImportsAsync(global::Android.Net.Uri uri)
     {
-        var imports = Path.Combine(CacheDir!.AbsolutePath, "imports");
+        var imports = IOPath.Combine(CacheDir!.AbsolutePath, "imports");
         Directory.CreateDirectory(imports);
 
         var name = QueryDisplayName(uri);
@@ -353,7 +355,7 @@ public sealed class MainActivity : Activity
             ?? FilesDir
             ?? throw new IOException("Android storage is unavailable.");
 
-        var root = Path.Combine(baseDir.AbsolutePath, "XenonForge");
+        var root = IOPath.Combine(baseDir.AbsolutePath, "XenonForge");
         Directory.CreateDirectory(root);
         return root;
     }
@@ -401,21 +403,21 @@ public sealed class MainActivity : Activity
 
     static string SanitizeFileName(string value)
     {
-        foreach (var ch in Path.GetInvalidFileNameChars())
+        foreach (var ch in IOPath.GetInvalidFileNameChars())
             value = value.Replace(ch, '_');
         return value;
     }
 
     static string GetUniquePath(string directory, string fileName)
     {
-        var candidate = Path.Combine(directory, fileName);
+        var candidate = IOPath.Combine(directory, fileName);
         if (!File.Exists(candidate)) return candidate;
 
-        var stem = Path.GetFileNameWithoutExtension(fileName);
-        var ext = Path.GetExtension(fileName);
+        var stem = IOPath.GetFileNameWithoutExtension(fileName);
+        var ext = IOPath.GetExtension(fileName);
         for (var i = 2; i < 10000; i++)
         {
-            candidate = Path.Combine(directory, $"{stem} ({i}){ext}");
+            candidate = IOPath.Combine(directory, $"{stem} ({i}){ext}");
             if (!File.Exists(candidate)) return candidate;
         }
 
