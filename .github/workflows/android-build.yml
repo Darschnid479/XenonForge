@@ -1,0 +1,52 @@
+name: Build XenonForge Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'XenonForge.Android/**'
+      - 'XenonForge.Core/**'
+      - 'XenonForge/Engine/**'
+      - 'XenonForge/Services/ZipImportService.vb'
+      - 'prepare-assets.ps1'
+      - '.github/workflows/android-build.yml'
+
+jobs:
+  android:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install Android workload
+        shell: pwsh
+        run: dotnet workload install android
+
+      - name: Prepare embedded assets
+        shell: pwsh
+        run: ./prepare-assets.ps1
+
+      - name: Build APK
+        shell: pwsh
+        run: dotnet publish XenonForge.Android/XenonForge.Android.csproj -c Release -f net8.0-android
+
+      - name: Collect APK
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path android-artifact | Out-Null
+          $apk = Get-ChildItem -Path XenonForge.Android/bin/Release -Recurse -Filter *.apk | Select-Object -First 1
+          if (-not $apk) { throw "No APK was produced." }
+          Copy-Item $apk.FullName android-artifact/XenonForge-Android.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: XenonForge-Android-APK
+          path: android-artifact/XenonForge-Android.apk
