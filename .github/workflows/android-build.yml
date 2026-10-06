@@ -19,26 +19,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-both:
+  windows:
+    name: Windows x64
     runs-on: windows-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-
-      - name: Install Android workload
-        shell: pwsh
-        run: dotnet workload install android --skip-manifest-update
 
       - name: Prepare embedded assets
         shell: pwsh
@@ -69,43 +61,105 @@ jobs:
           Copy-Item windows-publish/XenonForge.exe release-assets/XenonForge-Windows-v2.0.exe
           $hash = (Get-FileHash release-assets/XenonForge-Windows-v2.0.exe -Algorithm SHA256).Hash.ToLowerInvariant()
           Set-Content release-assets/XenonForge-Windows-v2.0.exe.sha256 "$hash  XenonForge-Windows-v2.0.exe"
+
           New-Item -ItemType Directory -Force -Path windows-package | Out-Null
           Copy-Item release-assets/XenonForge-Windows-v2.0.exe windows-package/XenonForge.exe
           Copy-Item README.md windows-package/README.md
           Copy-Item LICENSE windows-package/LICENSE
-          if (Test-Path THIRD-PARTY-NOTICES.txt) { Copy-Item THIRD-PARTY-NOTICES.txt windows-package/THIRD-PARTY-NOTICES.txt }
+          if (Test-Path THIRD-PARTY-NOTICES.txt) {
+            Copy-Item THIRD-PARTY-NOTICES.txt windows-package/THIRD-PARTY-NOTICES.txt
+          }
+
           Compress-Archive -Force -Path windows-package/* -DestinationPath release-assets/XenonForge-Windows-v2.0.zip
           $zipHash = (Get-FileHash release-assets/XenonForge-Windows-v2.0.zip -Algorithm SHA256).Hash.ToLowerInvariant()
           Set-Content release-assets/XenonForge-Windows-v2.0.zip.sha256 "$zipHash  XenonForge-Windows-v2.0.zip"
 
-      - name: Build Android APK
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: XenonForge-Windows-v2.0
+          path: release-assets/*
+
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install Android workload
+        run: dotnet workload install android --skip-manifest-update
+
+      - name: Prepare embedded assets
         shell: pwsh
+        run: ./prepare-assets.ps1
+
+      - name: Build Android APK
         run: dotnet publish XenonForge.Android/XenonForge.Android.csproj -c Release -f net10.0-android
 
       - name: Collect Android APK
         shell: pwsh
         run: |
+          New-Item -ItemType Directory -Force -Path release-assets | Out-Null
           $apks = Get-ChildItem -Path XenonForge.Android/bin/Release -Recurse -Filter *.apk
           if (-not $apks) { throw 'No APK was produced.' }
-          $apk = $apks | Where-Object { $_.Name -notmatch 'unsigned' } | Sort-Object Length -Descending | Select-Object -First 1
-          if (-not $apk) { $apk = $apks | Sort-Object Length -Descending | Select-Object -First 1 }
+
+          $apk = $apks |
+            Where-Object { $_.Name -notmatch 'unsigned' } |
+            Sort-Object Length -Descending |
+            Select-Object -First 1
+
+          if (-not $apk) {
+            $apk = $apks | Sort-Object Length -Descending | Select-Object -First 1
+          }
+
           Copy-Item $apk.FullName release-assets/XenonForge-Android-v2.0.apk
           $hash = (Get-FileHash release-assets/XenonForge-Android-v2.0.apk -Algorithm SHA256).Hash.ToLowerInvariant()
           Set-Content release-assets/XenonForge-Android-v2.0.apk.sha256 "$hash  XenonForge-Android-v2.0.apk"
 
-      - name: Upload combined build artifact
+      - name: Upload Android artifact
         uses: actions/upload-artifact@v4
         with:
-          name: XenonForge-v2.0-Windows-Android
+          name: XenonForge-Android-v2.0
           path: release-assets/*
 
+  release:
+    name: Publish v2.0
+    runs-on: ubuntu-latest
+    needs: [windows, android]
+
+    steps:
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: XenonForge-Windows-v2.0
+          path: release-assets
+
+      - name: Download Android artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: XenonForge-Android-v2.0
+          path: release-assets
+
       - name: Create or update v2.0 release
-        shell: pwsh
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view v2.0 --repo "${{ github.repository }}" *> $null
-          if ($LASTEXITCODE -ne 0) {
-            gh release create v2.0 --repo "${{ github.repository }}" --target "${{ github.sha }}" --title 'XenonForge v2.0' --notes 'XenonForge v2.0 for Windows and Android. Both platforms include the native conversion engine; Android mirrors the Windows Convert, USB Deploy, Library and Settings workflows using Android storage APIs.'
-          }
-          gh release upload v2.0 release-assets/* --repo "${{ github.repository }}" --clobber
+          if ! gh release view v2.0 --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release create v2.0 \
+              --repo "${{ github.repository }}" \
+              --target "${{ github.sha }}" \
+              --title "XenonForge v2.0" \
+              --notes "XenonForge v2.0 for Windows and Android. Both platforms use the native XenonForge conversion engine. Android mirrors the Windows Convert, USB Deploy, Library and Settings workflows through Android storage APIs."
+          fi
+
+          gh release upload v2.0 release-assets/* \
+            --repo "${{ github.repository }}" \
+            --clobber
