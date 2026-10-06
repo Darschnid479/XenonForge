@@ -1,4 +1,4 @@
-name: Build XenonForge Android APK
+name: Build XenonForge Windows + Android
 
 on:
   workflow_dispatch:
@@ -7,8 +7,7 @@ on:
     paths:
       - 'XenonForge.Android/**'
       - 'XenonForge.Core/**'
-      - 'XenonForge/Engine/**'
-      - 'XenonForge/Services/ZipImportService.vb'
+      - 'XenonForge/**'
       - 'prepare-assets.ps1'
       - '.github/workflows/android-build.yml'
 
@@ -16,7 +15,7 @@ permissions:
   contents: write
 
 jobs:
-  android:
+  build-both:
     runs-on: windows-latest
 
     steps:
@@ -28,6 +27,11 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
       - name: Install Android workload
         shell: pwsh
         run: dotnet workload install android
@@ -36,29 +40,60 @@ jobs:
         shell: pwsh
         run: ./prepare-assets.ps1
 
-      - name: Build APK
+      - name: Build Windows x64
+        shell: pwsh
+        run: dotnet publish XenonForge/XenonForge.vbproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:Version=2.0.0 -o windows-publish
+
+      - name: Smoke test Windows
+        shell: pwsh
+        run: |
+          $logDir = Join-Path $env:LOCALAPPDATA 'XenonForge'
+          Remove-Item -Recurse -Force $logDir -ErrorAction SilentlyContinue
+          $p = Start-Process -FilePath './windows-publish/XenonForge.exe' -PassThru
+          Start-Sleep -Seconds 5
+          if ($p.HasExited) {
+            $log = Join-Path $logDir 'startup-crash.log'
+            if (Test-Path $log) { Get-Content $log }
+            throw "Windows XenonForge failed startup smoke test with code $($p.ExitCode)."
+          }
+          Stop-Process -Id $p.Id -Force
+
+      - name: Package Windows
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release-assets | Out-Null
+          Copy-Item windows-publish/XenonForge.exe release-assets/XenonForge-Windows-v2.0.exe
+          $hash = (Get-FileHash release-assets/XenonForge-Windows-v2.0.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content release-assets/XenonForge-Windows-v2.0.exe.sha256 "$hash  XenonForge-Windows-v2.0.exe"
+          New-Item -ItemType Directory -Force -Path windows-package | Out-Null
+          Copy-Item release-assets/XenonForge-Windows-v2.0.exe windows-package/XenonForge.exe
+          Copy-Item README.md windows-package/README.md
+          Copy-Item LICENSE windows-package/LICENSE
+          if (Test-Path THIRD-PARTY-NOTICES.txt) { Copy-Item THIRD-PARTY-NOTICES.txt windows-package/THIRD-PARTY-NOTICES.txt }
+          Compress-Archive -Force -Path windows-package/* -DestinationPath release-assets/XenonForge-Windows-v2.0.zip
+          $zipHash = (Get-FileHash release-assets/XenonForge-Windows-v2.0.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content release-assets/XenonForge-Windows-v2.0.zip.sha256 "$zipHash  XenonForge-Windows-v2.0.zip"
+
+      - name: Build Android APK
         shell: pwsh
         run: dotnet publish XenonForge.Android/XenonForge.Android.csproj -c Release -f net10.0-android
 
-      - name: Collect APK
+      - name: Collect Android APK
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path android-artifact | Out-Null
           $apks = Get-ChildItem -Path XenonForge.Android/bin/Release -Recurse -Filter *.apk
-          if (-not $apks) { throw "No APK was produced." }
+          if (-not $apks) { throw 'No APK was produced.' }
           $apk = $apks | Where-Object { $_.Name -notmatch 'unsigned' } | Sort-Object Length -Descending | Select-Object -First 1
           if (-not $apk) { $apk = $apks | Sort-Object Length -Descending | Select-Object -First 1 }
-          Copy-Item $apk.FullName android-artifact/XenonForge-Android-v2.0.apk
-          $hash = (Get-FileHash android-artifact/XenonForge-Android-v2.0.apk -Algorithm SHA256).Hash.ToLowerInvariant()
-          Set-Content android-artifact/XenonForge-Android-v2.0.apk.sha256 "$hash  XenonForge-Android-v2.0.apk"
+          Copy-Item $apk.FullName release-assets/XenonForge-Android-v2.0.apk
+          $hash = (Get-FileHash release-assets/XenonForge-Android-v2.0.apk -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content release-assets/XenonForge-Android-v2.0.apk.sha256 "$hash  XenonForge-Android-v2.0.apk"
 
-      - name: Upload APK artifact
+      - name: Upload combined build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: XenonForge-Android-v2.0
-          path: |
-            android-artifact/XenonForge-Android-v2.0.apk
-            android-artifact/XenonForge-Android-v2.0.apk.sha256
+          name: XenonForge-v2.0-Windows-Android
+          path: release-assets/*
 
       - name: Create or update v2.0 release
         shell: pwsh
@@ -67,6 +102,6 @@ jobs:
         run: |
           gh release view v2.0 --repo "${{ github.repository }}" *> $null
           if ($LASTEXITCODE -ne 0) {
-            gh release create v2.0 --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "XenonForge v2.0" --notes "XenonForge v2.0 adds the Android APK edition alongside the Windows project. Android supports ISO/ZIP import, Xbox metadata scanning, GOD conversion, and XEX/XBE folder extraction."
+            gh release create v2.0 --repo "${{ github.repository }}" --target "${{ github.sha }}" --title 'XenonForge v2.0' --notes 'XenonForge v2.0 for Windows and Android. Both platforms include the native conversion engine; Android mirrors the Windows Convert, USB Deploy, Library and Settings workflows using Android storage APIs.'
           }
-          gh release upload v2.0 android-artifact/XenonForge-Android-v2.0.apk android-artifact/XenonForge-Android-v2.0.apk.sha256 --repo "${{ github.repository }}" --clobber
+          gh release upload v2.0 release-assets/* --repo "${{ github.repository }}" --clobber
