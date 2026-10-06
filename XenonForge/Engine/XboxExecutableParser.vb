@@ -1,7 +1,7 @@
 Imports System.IO
 
 Namespace Engine
-    Friend Module XboxExecutableParser
+    Public Module XboxExecutableParser
         Private Const XexExecutionInfoKey As UInteger = &H40006UI
 
         Public Function ReadTitleInfo(isoPath As String) As XboxTitleInfo
