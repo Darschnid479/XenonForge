@@ -89,9 +89,9 @@ public sealed class MainActivity : Activity
 
         var header = new LinearLayout(this)
         {
-            Orientation = Orientation.Horizontal,
-            Gravity = GravityFlags.CenterVertical
+            Orientation = Orientation.Horizontal
         };
+        header.SetGravity(GravityFlags.CenterVertical);
         header.SetPadding(Dp(16), Dp(14), Dp(16), Dp(8));
 
         var brand = new TextView(this) { Text = "XF", TextSize = 19f, Gravity = GravityFlags.Center };
