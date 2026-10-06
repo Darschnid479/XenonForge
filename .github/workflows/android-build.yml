@@ -12,6 +12,9 @@ on:
       - 'prepare-assets.ps1'
       - '.github/workflows/android-build.yml'
 
+permissions:
+  contents: write
+
 jobs:
   android:
     runs-on: windows-latest
@@ -20,10 +23,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET 8
+      - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Install Android workload
         shell: pwsh
@@ -35,18 +38,35 @@ jobs:
 
       - name: Build APK
         shell: pwsh
-        run: dotnet publish XenonForge.Android/XenonForge.Android.csproj -c Release -f net8.0-android
+        run: dotnet publish XenonForge.Android/XenonForge.Android.csproj -c Release -f net10.0-android
 
       - name: Collect APK
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path android-artifact | Out-Null
-          $apk = Get-ChildItem -Path XenonForge.Android/bin/Release -Recurse -Filter *.apk | Select-Object -First 1
-          if (-not $apk) { throw "No APK was produced." }
-          Copy-Item $apk.FullName android-artifact/XenonForge-Android.apk
+          $apks = Get-ChildItem -Path XenonForge.Android/bin/Release -Recurse -Filter *.apk
+          if (-not $apks) { throw "No APK was produced." }
+          $apk = $apks | Where-Object { $_.Name -notmatch 'unsigned' } | Sort-Object Length -Descending | Select-Object -First 1
+          if (-not $apk) { $apk = $apks | Sort-Object Length -Descending | Select-Object -First 1 }
+          Copy-Item $apk.FullName android-artifact/XenonForge-Android-v2.0.apk
+          $hash = (Get-FileHash android-artifact/XenonForge-Android-v2.0.apk -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content android-artifact/XenonForge-Android-v2.0.apk.sha256 "$hash  XenonForge-Android-v2.0.apk"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: XenonForge-Android-APK
-          path: android-artifact/XenonForge-Android.apk
+          name: XenonForge-Android-v2.0
+          path: |
+            android-artifact/XenonForge-Android-v2.0.apk
+            android-artifact/XenonForge-Android-v2.0.apk.sha256
+
+      - name: Create or update v2.0 release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view v2.0 --repo "${{ github.repository }}" *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create v2.0 --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "XenonForge v2.0" --notes "XenonForge v2.0 adds the Android APK edition alongside the Windows project. Android supports ISO/ZIP import, Xbox metadata scanning, GOD conversion, and XEX/XBE folder extraction."
+          }
+          gh release upload v2.0 android-artifact/XenonForge-Android-v2.0.apk android-artifact/XenonForge-Android-v2.0.apk.sha256 --repo "${{ github.repository }}" --clobber
