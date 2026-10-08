@@ -7,6 +7,11 @@ Namespace Services
         Public Property SmartTrim As Boolean = True
         Public Property AutoDeployAfterConvert As Boolean = False
         Public Property LastUsbRoot As String = String.Empty
+        Public Property FtpHost As String = String.Empty
+        Public Property FtpPort As Integer = 21
+        Public Property FtpUsername As String = "xbox"
+        Public Property FtpRemoteContentPath As String = "/Hdd1/Content/0000000000000000"
+        Public Property FtpUsePassive As Boolean = True
 
         Private Shared ReadOnly SettingsFile As String = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "XenonForge", "settings.json")
 
