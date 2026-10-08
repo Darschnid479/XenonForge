@@ -13,6 +13,7 @@ Public Class MainForm
 
     Private ReadOnly _settings As AppSettings = AppSettings.Load()
     Private ReadOnly _usb As New UsbDeploymentService()
+    Private ReadOnly _ftp As New FtpDeploymentService()
     Private ReadOnly _zipImport As New ZipImportService()
     Private _cts As CancellationTokenSource
     Private _busy As Boolean
@@ -87,11 +88,13 @@ Public Class MainForm
 
         Dim navConvert = AddSideLabel(sidebar, "●  CONVERT", 120, True)
         Dim navUsb = AddSideLabel(sidebar, "▣  USB DEPLOY", 166, False)
-        Dim navLibrary = AddSideLabel(sidebar, "◫  LIBRARY", 212, False)
-        Dim navSettings = AddSideLabel(sidebar, "⚙  SETTINGS", 258, False)
+        Dim navFtp = AddSideLabel(sidebar, "⇄  FTP DEPLOY", 212, False)
+        Dim navLibrary = AddSideLabel(sidebar, "◫  LIBRARY", 258, False)
+        Dim navSettings = AddSideLabel(sidebar, "⚙  SETTINGS", 304, False)
 
         AddHandler navConvert.Click, Sub() status.Text = "Convert workspace active."
         AddHandler navUsb.Click, AddressOf OpenUsbDeploy
+        AddHandler navFtp.Click, AddressOf OpenFtpDeploy
         AddHandler navLibrary.Click, AddressOf OpenLibrary
         AddHandler navSettings.Click, AddressOf OpenSettings
 
@@ -141,7 +144,7 @@ Public Class MainForm
             .Location = New Point(28, 22)
         })
         main.Controls.Add(New Label With {
-            .Text = "Identify the game • convert natively • deploy straight to USB",
+            .Text = "Identify the game • convert natively • deploy straight to USB or Xbox FTP",
             .Font = Theme.Font(10.0F),
             .ForeColor = Theme.TextMuted,
             .AutoSize = True,
@@ -183,6 +186,12 @@ Public Class MainForm
         cancel.Width = 92
         AddHandler cancel.Click, Sub(sender, e) _cts?.Cancel()
         main.Controls.Add(cancel)
+
+        Dim ftpDeploy = MakeButton("FTP DEPLOY", Color.FromArgb(13, 148, 136), Color.FromArgb(20, 184, 166), Color.White)
+        ftpDeploy.Location = New Point(832, 104)
+        ftpDeploy.Width = 118
+        AddHandler ftpDeploy.Click, AddressOf OpenFtpDeploy
+        main.Controls.Add(ftpDeploy)
 
         Dim split As New TableLayoutPanel With {
             .Location = New Point(28, 162),
@@ -684,6 +693,14 @@ Public Class MainForm
             dialog.ShowDialog(Me)
         End Using
         RefreshUsb()
+    End Sub
+
+    Private Sub OpenFtpDeploy(sender As Object, e As EventArgs)
+        SaveSettings()
+        Using dialog As New FtpDeployForm(GetCompletedResults(), _settings, _ftp)
+            dialog.ShowDialog(Me)
+        End Using
+        status.Text = "FTP deploy closed."
     End Sub
 
     Private Sub OpenLibrary(sender As Object, e As EventArgs)
