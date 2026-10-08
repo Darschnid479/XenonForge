@@ -1,3 +1,5 @@
+Imports System.Collections.Generic
+Imports System.Linq
 Imports System.IO
 Imports System.Net
 Imports System.Threading
@@ -71,7 +73,7 @@ Namespace Services
                     created.Add(remoteParent)
                 End If
 
-                Await UploadFileAsync(
+                uploaded += Await UploadFileAsync(
                     file,
                     remoteFile,
                     options,
@@ -88,11 +90,12 @@ Namespace Services
                                                       remotePath As String,
                                                       options As FtpDeploymentOptions,
                                                       totalBytes As Long,
-                                                      ByRef uploadedBytes As Long,
+                                                      uploadedBefore As Long,
                                                       progress As IProgress(Of FtpDeploymentProgress),
-                                                      cancellationToken As CancellationToken) As Task
+                                                      cancellationToken As CancellationToken) As Task(Of Long)
             Dim request = CreateRequest(options, remotePath, WebRequestMethods.Ftp.UploadFile)
             request.ContentLength = New FileInfo(localPath).Length
+            Dim uploadedThisFile As Long = 0
 
             Using cancellationToken.Register(Sub() request.Abort())
                 Using input As New FileStream(localPath, FileMode.Open, FileAccess.Read, FileShare.Read, BufferSize, FileOptions.Asynchronous Or FileOptions.SequentialScan)
@@ -104,13 +107,14 @@ Namespace Services
                             If read <= 0 Then Exit While
 
                             Await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken)
-                            uploadedBytes += read
+                            uploadedThisFile += read
+                            Dim currentTotal = uploadedBefore + uploadedThisFile
 
                             If progress IsNot Nothing Then
                                 progress.Report(New FtpDeploymentProgress With {
-                                    .Percent = CInt(Math.Min(100L, uploadedBytes * 100L \ Math.Max(1L, totalBytes))),
+                                    .Percent = CInt(Math.Min(100L, currentTotal * 100L \ Math.Max(1L, totalBytes))),
                                     .CurrentFile = Path.GetFileName(localPath),
-                                    .UploadedBytes = uploadedBytes,
+                                    .UploadedBytes = currentTotal,
                                     .TotalBytes = totalBytes
                                 })
                             End If
@@ -122,6 +126,8 @@ Namespace Services
                 Using response = DirectCast(Await request.GetResponseAsync(), FtpWebResponse)
                 End Using
             End Using
+
+            Return uploadedThisFile
         End Function
 
         Private Shared Async Function EnsureDirectoryAsync(options As FtpDeploymentOptions,
